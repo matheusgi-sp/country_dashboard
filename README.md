@@ -17,10 +17,20 @@ A personal Streamlit dashboard that tracks Brazil's economy through **8 indicato
 
 ## Layout
 
-- **Snapshot:** 8 KPI tiles showing the latest value and its change. Hover the ⓘ icon for dates and context.
+The dashboard uses a Kellogg purple theme (#4E2A84). The theme is applied in `app.py`, so no extra config file is needed.
+
+- **This week's read:** an auto-generated summary with one line per indicator and a status tag (✓ Favorable, ! Watch, ▲ Concern, ● Neutral).
+- **Snapshot:** 8 KPI cards showing the latest value, its change, a status tag and the data date.
 - **📈 Macro:** charts for indicators 1–6, with a data table and CSV download.
-- **🏢 Private sector:** credit growth to companies vs. households, and the non-performing loan rate.
+- **🏢 Private sector:** credit growth to companies vs. households (with inflation as a reference line), and the non-performing loan rate.
 - **🏛️ Taxes & spending:** where federal money comes from and where it goes. "Special Charges" (debt service, debt refinancing and transfers) is hidden by default because it dwarfs every other function.
+
+Every chart has three layers of explanation:
+- **Why it matters:** the role the indicator plays in the economy.
+- **Now:** a one-line, auto-generated read of the latest data.
+- **How to read it:** what to look for in the chart.
+
+The status tags come from simple rules defined in the `sig_*` functions in `app.py`, such as inflation above the 4.5% ceiling or credit growing below inflation. Adjust the thresholds there if you want different cut-offs. The explanation text lives in the `EXPLAIN` dictionary.
 
 ## Deploy (GitHub + Streamlit Community Cloud)
 
