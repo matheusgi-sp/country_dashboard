@@ -13,6 +13,7 @@ a refresh at any time.
 """
 
 import datetime as dt
+import logging
 import time
 import unicodedata
 import urllib.parse
@@ -30,6 +31,9 @@ st.set_page_config(page_title="Brazil Economy Monitor", page_icon="🇧🇷", la
 CACHE_TTL = 7 * 24 * 3600  # weekly refresh
 TIMEOUT = 40
 HEADERS = {"User-Agent": "Mozilla/5.0 (BrazilEconomyMonitor; personal use)"}
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("brazil_monitor")
 
 # BCB SGS series codes (change here if you want different series)
 SGS = {
@@ -133,8 +137,9 @@ def fetch_sgs(code: int) -> pd.Series:
         pd.to_numeric(df["valor"], errors="coerce").values,
         index=pd.to_datetime(df["data"], format="%d/%m/%Y"),
         name=str(code),
-    ).dropna()
-    return s.sort_index()
+    ).dropna().sort_index()
+    log.info("Fetched SGS %s: %d obs, latest %s = %s", code, len(s), s.index[-1].date(), s.iloc[-1])
+    return s
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
@@ -147,8 +152,9 @@ def fetch_unemployment() -> pd.Series:
         pd.to_numeric(df["V"], errors="coerce").values,
         index=pd.to_datetime(df["D3C"], format="%Y%m"),  # end month of rolling quarter
         name="unemployment",
-    ).dropna()
-    return s.sort_index()
+    ).dropna().sort_index()
+    log.info("Fetched SIDRA 6381: %d obs, latest %s = %s", len(s), s.index[-1].date(), s.iloc[-1])
+    return s
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
@@ -168,6 +174,8 @@ def fetch_focus_ipca() -> pd.DataFrame:
     latest = df["Data"].max()
     df = df[df["Data"] == latest].copy()
     df["DataReferencia"] = df["DataReferencia"].astype(str)
+    log.info("Fetched Focus IPCA survey of %s: %s", latest,
+             dict(zip(df["DataReferencia"], df["Mediana"])))
     return df
 
 
@@ -187,7 +195,16 @@ def fetch_rreo(year: int, period: int, annex: str) -> pd.DataFrame:
         if not page.get("hasMore") or not batch:
             break
         offset += len(batch)
+    log.info("Fetched Siconfi %s %s/%s: %d rows", annex, period, year, len(items))
     return pd.DataFrame(items)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def data_stamp() -> dt.datetime:
+    """Time of the last real download; reset whenever the cache is cleared."""
+    stamp = dt.datetime.now(dt.timezone.utc)
+    log.info("Data refresh started at %s", stamp.isoformat())
+    return stamp
 
 
 def latest_rreo(annex: str):
@@ -631,11 +648,12 @@ with st.sidebar:
                 unsafe_allow_html=True)
 
 start = pd.Timestamp(dt.date.today()) - pd.DateOffset(years=years)
+stamp = data_stamp()
 
 st.markdown(
     f'<div class="hero"><h1>🇧🇷 Brazil Economy Monitor</h1>'
     f'<p>Eight indicators covering growth, inflation, rates, the real, jobs, public debt, private credit '
-    f'and federal taxes · updated {dt.date.today():%b %d, %Y}</p></div>',
+    f'and federal taxes · data fetched {stamp:%b %d, %Y %H:%M} UTC</p></div>',
     unsafe_allow_html=True)
 
 with st.spinner("Loading data from BCB, IBGE and Tesouro..."):
